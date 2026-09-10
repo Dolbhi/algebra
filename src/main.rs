@@ -18,8 +18,8 @@ fn main() -> eframe::Result {
 
 #[derive(Default)]
 struct MyApp {
-    show_confirmation_dialog: bool,
-    allowed_to_close: bool,
+    // show_confirmation_dialog: bool,
+    // allowed_to_close: bool,
     text_box_text: String,
 }
 
@@ -37,7 +37,27 @@ impl eframe::App for MyApp {
 
         egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("Central Panel");
+            ui.vertical_centered(|ui| {
+                let mut frame = egui::Frame::default().inner_margin(4.0).begin(ui);
+                {
+                    let response = frame.content_ui.label("Inside the frame 1");
+                    if response.hovered() {
+                        frame.frame.fill = egui::Color32::RED;
+                    }
+                }
+                frame.end(ui); // Will "close" the frame.
+                let mut frame = egui::Frame::default().inner_margin(4.0).begin(ui);
+                {
+                    let response = frame.content_ui.label("Inside the frame 2");
+                    if response.hovered() {
+                        frame.frame.fill = egui::Color32::GREEN;
+                    }
+                }
+                frame.end(ui); // Will "close" the frame.
+            });
         });
+
+        
 
         // if ui.input(|i| i.viewport().close_requested()) {
         //     if self.allowed_to_close {
