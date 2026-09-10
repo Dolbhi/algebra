@@ -19,16 +19,34 @@ fn main() -> eframe::Result {
 #[derive(Default)]
 struct MyApp {
     text_box_text: String,
+    variables: Vec<String>,
+    vars_editing: bool,
 }
 
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::right(Id::new("right")).exact_size(200.0).show(ui, |ui| {
             ui.heading("Side panel");
+            ui.checkbox(&mut self.vars_editing, "Edit Vars");
+            if self.vars_editing {
+                for var in self.variables.iter_mut() {
+                    ui.text_edit_singleline(var);
+                }
+            }
+            else {
+                for var in self.variables.iter() {
+                    if ui.button(var).clicked() {
+                        self.text_box_text += var;
+                    }
+                }
+            }
         });
 
         egui::Panel::bottom(Id::new("bottom")).exact_size(120.0).show(ui, |ui| {
             ui.heading("Input");
+            if ui.button("Add as variable").clicked() {
+                self.variables.push(self.text_box_text.clone());
+            }
             ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                 egui::TextEdit::multiline(&mut self.text_box_text).hint_text("Math here").show(ui);
             });
