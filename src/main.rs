@@ -1,5 +1,6 @@
 use eframe::egui;
 use egui::Id;
+use egui_commonmark;
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -27,12 +28,14 @@ impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::Panel::bottom(Id::new("bottom_1")).show(ui, |ui| {
             ui.heading("Bottom Panel");
-            ui.text_edit_singleline(&mut self.text_box_text);
+            ui.text_edit_multiline(&mut self.text_box_text);
         });
 
         egui::Panel::bottom(Id::new("bottom_2")).show(ui, |ui| {
             ui.heading("Bottom Panel 2");
-            ui.label(format!("The box says: {}", self.text_box_text));
+            // ui.label(format!("The box says: {}", self.text_box_text));
+            let mut cache = egui_commonmark::CommonMarkCache::default();
+            egui_commonmark::CommonMarkViewer::new().show(ui, &mut cache, self.text_box_text.as_str());
         });
 
         egui::CentralPanel::default().show(ui, |ui| {
