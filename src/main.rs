@@ -28,18 +28,22 @@ impl eframe::App for MyApp {
         egui::Panel::right(Id::new("right")).exact_size(200.0).show(ui, |ui| {
             ui.heading("Side panel");
             ui.checkbox(&mut self.vars_editing, "Edit Vars");
-            if self.vars_editing {
-                for var in self.variables.iter_mut() {
-                    ui.text_edit_singleline(var);
-                }
-            }
-            else {
-                for var in self.variables.iter() {
-                    if ui.button(var).clicked() {
-                        self.text_box_text += var;
+            ui.with_layout(Layout::left_to_right(egui::Align::Min).with_main_wrap(true), |ui| {
+                if self.vars_editing {
+                    let font_id = egui::FontId::default();
+                    for var in self.variables.iter_mut() {
+                        let gallery = ui.fonts_mut(|f| f.layout_no_wrap(var.clone(), font_id.clone(), egui::Color32::BLACK));
+                        egui::TextEdit::singleline(var).desired_width(gallery.size().length() + 1.).show(ui);
                     }
                 }
-            }
+                else {
+                    for var in self.variables.iter() {
+                        if ui.button(var).clicked() {
+                            self.text_box_text += var;
+                        }
+                    }
+                }
+            });
         });
 
         egui::Panel::bottom(Id::new("bottom")).exact_size(120.0).show(ui, |ui| {
