@@ -1,13 +1,16 @@
 use eframe::egui;
+use egui::Id;
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1280.0, 720.0])
+            .with_resizable(true),
         ..Default::default()
     };
     eframe::run_native(
-        "Confirm exit",
+        "Math Manipulator",
         options,
         Box::new(|_cc| Ok(Box::<MyApp>::default())),
     )
@@ -17,12 +20,23 @@ fn main() -> eframe::Result {
 struct MyApp {
     show_confirmation_dialog: bool,
     allowed_to_close: bool,
+    text_box_text: String,
 }
 
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::Panel::bottom(Id::new("bottom_1")).show(ui, |ui| {
+            ui.heading("Bottom Panel");
+            ui.text_edit_singleline(&mut self.text_box_text);
+        });
+
+        egui::Panel::bottom(Id::new("bottom_2")).show(ui, |ui| {
+            ui.heading("Bottom Panel 2");
+            ui.label(format!("The box says: {}", self.text_box_text));
+        });
+
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.heading("Try to close the window");
+            ui.heading("Central Panel");
         });
 
         if ui.input(|i| i.viewport().close_requested()) {
