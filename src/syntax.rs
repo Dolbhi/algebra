@@ -40,7 +40,7 @@ impl SyntaxTree {
                 if let Ok((next, end_i)) = next_expr {
                     // implied mult (no operator)
                     result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
-                    i += 1 + end_i;
+                    i += end_i;
                 } else if let Token::Op(Operation::Add) = tokens[i] {
                     // addition
                     let next = Self::parse_tokens(&tokens[i+1..tokens.len()])?;
@@ -56,6 +56,7 @@ impl SyntaxTree {
                 // truly first expression
                 result = Some(next_expr?.0);
             }
+            // println!("Partial result: {:?}", result);
             i += 1;
         }
         result.ok_or(ParseError::Err("Unable to parse anything!".to_owned()))
@@ -66,7 +67,7 @@ impl SyntaxTree {
         match &tokens[0] {
             Token::OpenPeren => {
                 let closing_i = find_closing_bracket(tokens, 0)?;
-                Self::parse_tokens(&tokens[1..closing_i-1]).map(|tree| (tree, closing_i))
+                Self::parse_tokens(&tokens[1..closing_i]).map(|tree| (tree, closing_i))
             },
             Token::Var(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
             _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", tokens[0])))
