@@ -46,13 +46,25 @@ impl eframe::App for MyApp {
             });
         });
 
+        let mut math_highlighter = |ui: &egui::Ui, string: &dyn egui::TextBuffer, wrap_width: f32| {
+            let mut job = egui::text::LayoutJob::default();
+            job.wrap.max_width = wrap_width;
+            let mut words = string.as_str().split(|c| c == 'a');
+            job.append(words.next().unwrap(), 0., egui::TextFormat::default());
+            for word in words {
+                job.append("a", 0., egui::TextFormat{color: Color32::RED, ..egui::TextFormat::default()});
+                job.append(word, 0., egui::TextFormat::default());
+            }
+
+            ui.fonts_mut(|f| f.layout_job(job))
+        };
         egui::Panel::bottom(Id::new("bottom")).exact_size(120.0).show(ui, |ui| {
             ui.heading("Input");
             if ui.button("Add as variable").clicked() {
                 self.variables.push(self.text_box_text.clone());
             }
             ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
-                egui::TextEdit::multiline(&mut self.text_box_text).hint_text("Math here").show(ui);
+                egui::TextEdit::multiline(&mut self.text_box_text).hint_text("Math here").layouter(&mut math_highlighter).show(ui);
             });
         });
 
