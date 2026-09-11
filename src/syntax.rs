@@ -88,12 +88,21 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
                 } else {
                     // var name end, push as token
                     tokens.push(Token::Var(var));
+                    // not a name/value
+                    match c {
+                    '(' => tokens.push(Token::OpenPeren),
+                    ')' => tokens.push(Token::ClosePeren),
+                    '*' => tokens.push(Token::Op(Operation::Mult)),
+                    '+' => tokens.push(Token::Op(Operation::Add)),
+                    _ => {invalid_char = Some(c); break;}
+                }
                 }
             } else if c.is_alphanumeric() {
                 // var start
                 current_var = Some(c.to_string());
             }
             else {
+                // not a name/value
                 match c {
                     '(' => tokens.push(Token::OpenPeren),
                     ')' => tokens.push(Token::ClosePeren),
@@ -102,6 +111,10 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
                     _ => {invalid_char = Some(c); break;}
                 }
             }
+        }
+        // word end, push cached name as var
+        if let Some(var) = current_var {
+            tokens.push(Token::Var(var));
         }
 
         tokens

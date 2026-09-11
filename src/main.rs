@@ -3,7 +3,7 @@ use egui::{Color32, Id, Layout};
 use algebra::syntax;
 
 fn main() -> eframe::Result {
-    let res = syntax::SyntaxTree::parse(" a 2 ee aw (2 2) * (ee) + 2");
+    let res = syntax::SyntaxTree::parse(" a 2 ee aw (2 2) * (aa) + 2");
     println!("Parse resutl: {:?}", res);
 
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
