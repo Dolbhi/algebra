@@ -1,11 +1,10 @@
-use std::ops::Index;
-
 pub enum SyntaxTree {
     Var(usize),
     Num(f32),
     Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>)
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Operation {
     Add,
     Mult
@@ -15,6 +14,7 @@ pub enum ParseError {
     Err
 }
 
+#[derive(PartialEq, Eq)]
 enum Token {
     Val(String),
     OpenPeren,
@@ -24,8 +24,11 @@ enum Token {
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Self, ParseError> {
-        let tokens = convert_to_tokens(string);
+        let tokens = convert_to_tokens(string).map_err(|_| ParseError::Err)?;
+        Self::parse_tokens(tokens)
+    }
 
+    fn parse_tokens(tokens: Vec<Token>) -> Result<Self, ParseError> {
         Err(ParseError::Err)
     }
 }
@@ -67,26 +70,26 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
     }
 }
 
-// /// Assumes `start` is the index of opening bracket
-// fn find_closing_bracket(string: &str, start: usize) -> Result<usize, ParseError> {
-//     let mut depth = 1;
-//     let mut i = start + 1;
-//     while i < string.len() {
-//         let char = string.get(i..i+1).unwrap();
-//         if char == '(' {
-//             depth += 1;
-//         } else if char == ')' {
-//             depth -= 1;
-//             if depth == 0 {
-//                 return Ok(i);
-//             }
-//         }
-//         i += 1;
-//     }
-//     Err(ParseError::Err)
-//     // if depth != 0 {
-//     //     Err(ParseError::Err)
-//     // } else {
-//     //     Ok()
-//     // }
-// }
+/// Assumes `start` is the index of opening bracket, returns index of closing bracket
+fn find_closing_bracket(tokens: Vec<Token>, start: usize) -> Result<usize, ParseError> {
+    let mut depth = 1;
+    let mut i = start + 1;
+    while i < tokens.len() {
+        let token = &tokens[i];
+        if *token == Token::OpenPeren {
+            depth += 1;
+        } else if *token == Token::ClosePeren {
+            depth -= 1;
+            if depth == 0 {
+                return Ok(i);
+            }
+        }
+        i += 1;
+    }
+    Err(ParseError::Err)
+    // if depth != 0 {
+    //     Err(ParseError::Err)
+    // } else {
+    //     Ok()
+    // }
+}
