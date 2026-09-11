@@ -40,7 +40,7 @@ impl SyntaxTree {
                 if let Ok((next, end_i)) = next_expr {
                     // implied mult (no operator)
                     result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
-                    i = end_i;
+                    i += 1 + end_i;
                 } else if let Token::Op(Operation::Add) = tokens[i] {
                     // addition
                     let next = Self::parse_tokens(&tokens[i+1..tokens.len()])?;
@@ -50,7 +50,7 @@ impl SyntaxTree {
                     // multiplication
                     let (next, end_i) = Self::parse_top(&tokens[i+1..tokens.len()])?;
                     result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
-                    i = end_i;
+                    i += 1 + end_i;
                 }
             } else {
                 // truly first expression

@@ -4,7 +4,7 @@ use algebra::syntax;
 
 fn main() -> eframe::Result {
     let res = syntax::SyntaxTree::parse(" a 2 ee aw (2 2) * (aa) + 2");
-    println!("Parse resutl: {:?}", res);
+    println!("Parse result: {:?}", res);
 
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
