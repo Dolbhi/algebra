@@ -1,10 +1,10 @@
 pub enum SyntaxTree {
-    Var(usize),
+    Var(String),
     Num(f32),
     Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>)
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Operation {
     Add,
     Mult
@@ -14,22 +14,60 @@ pub enum ParseError {
     Err
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 enum Token {
-    Val(String),
+    Var(String),
     OpenPeren,
     ClosePeren,
     Op(Operation),
 }
 
 impl SyntaxTree {
-    pub fn parse(string: &str) -> Result<Self, ParseError> {
+    pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
         let tokens = convert_to_tokens(string).map_err(|_| ParseError::Err)?;
-        Self::parse_tokens(tokens)
+        Self::parse_tokens(&tokens.as_slice())
     }
 
-    fn parse_tokens(tokens: Vec<Token>) -> Result<Self, ParseError> {
-        Err(ParseError::Err)
+    fn parse_tokens(tokens: &[Token]) -> Result<Box<Self>, ParseError> {
+        let mut result: Option<Box<SyntaxTree>> = None;
+        let mut i = 0;
+        while i < tokens.len() {
+            let next_expr = Self::parse_top(&tokens[i..tokens.len()]);
+            if let Some(prev) = result.take() {
+                if let Ok((next, end_i)) = next_expr {
+                    // implied mult (no operator)
+                    result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
+                    i = end_i;
+                } else if let Token::Op(Operation::Add) = tokens[i] {
+                    // addition
+                    let next = Self::parse_tokens(&tokens[i+1..tokens.len()])?;
+                    result = Some(Box::new(SyntaxTree::Op(Operation::Add, prev, next)));
+                    i = tokens.len();
+                } else if let Token::Op(Operation::Mult) = tokens[i] {
+                    // multiplication
+                    let (next, end_i) = Self::parse_top(&tokens[i+1..tokens.len()])?;
+                    result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
+                    i = end_i;
+                }
+            } else {
+                // truly first expression
+                result = Some(next_expr?.0);
+            }
+            i += 1;
+        }
+        result.ok_or(ParseError::Err)
+    }
+
+    /// Parses first valid tree of the token list, returning also the index of the last token parsed
+    fn parse_top(tokens: &[Token]) -> Result<(Box<Self>, usize), ParseError> {
+        match &tokens[0] {
+            Token::OpenPeren => {
+                let closing_i = find_closing_bracket(tokens, 0)?;
+                Self::parse_tokens(&tokens[1..closing_i-1]).map(|tree| (tree, closing_i))
+            },
+            Token::Var(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
+            _ => Err(ParseError::Err)
+        }
     }
 }
 
@@ -46,9 +84,9 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
                     current_var = Some(var);
                 } else {
                     // var name end, push as token
-                    tokens.push(Token::Val(var));
+                    tokens.push(Token::Var(var));
                 }
-            } else if c.is_alphabetic() {
+            } else if c.is_alphanumeric() {
                 // var start
                 current_var = Some(c.to_string());
             }
@@ -71,7 +109,7 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
 }
 
 /// Assumes `start` is the index of opening bracket, returns index of closing bracket
-fn find_closing_bracket(tokens: Vec<Token>, start: usize) -> Result<usize, ParseError> {
+fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseError> {
     let mut depth = 1;
     let mut i = start + 1;
     while i < tokens.len() {
