@@ -149,3 +149,83 @@ fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseEr
     //     Ok()
     // }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn token_simple() {
+        let test = "a xy 1 32 ( ) * +";
+        let tokens = convert_to_tokens(test);
+        let expected = vec![
+            Token::Var("a".to_owned()), 
+            Token::Var("xy".to_owned()),
+            Token::Var("1".to_owned()),
+            Token::Var("32".to_owned()),
+            Token::OpenPeren,
+            Token::ClosePeren,
+            Token::Op(Operation::Mult),
+            Token::Op(Operation::Add),
+        ];
+        assert_eq!(tokens, Ok(expected));
+    }
+
+    #[test]
+    fn token_whitespace() {
+        let test = " a b ab  1    abc 123      1 a 1 2";
+        let tokens = convert_to_tokens(test);
+        let expected = vec![
+            Token::Var("a".to_owned()), 
+            Token::Var("b".to_owned()),
+            Token::Var("ab".to_owned()),
+            Token::Var("1".to_owned()),
+            Token::Var("abc".to_owned()),
+            Token::Var("123".to_owned()),
+            Token::Var("1".to_owned()),
+            Token::Var("a".to_owned()),
+            Token::Var("1".to_owned()),
+            Token::Var("2".to_owned()),
+        ];
+        assert_eq!(tokens, Ok(expected));
+    }
+
+    #[test]
+    fn token_no_whitespace() {
+        let test = "whattheheckisthis123yes*2*5*me+(eea*ee)";
+        let tokens = convert_to_tokens(test);
+        let expected = vec![
+            Token::Var("whattheheckisthis123yes".to_owned()), 
+            Token::Op(Operation::Mult),
+            Token::Var("2".to_owned()),
+            Token::Op(Operation::Mult),
+            Token::Var("5".to_owned()),
+            Token::Op(Operation::Mult),
+            Token::Var("me".to_owned()),
+            Token::Op(Operation::Add),
+            Token::OpenPeren,
+            Token::Var("eea".to_owned()),
+            Token::Op(Operation::Mult),
+            Token::Var("ee".to_owned()),
+            Token::ClosePeren,
+        ];
+        assert_eq!(tokens, Ok(expected));
+    }
+
+    // #[test]
+    // fn token_invalid_name() {
+    //     let test = "1a";
+    //     let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
+    //     let expected: Result<Vec<Token>, String> = Err("Invalid var name: 1a".to_owned());
+    //     assert_eq!(tokens, expected);
+    // }
+
+
+    #[test]
+    fn token_invalid_char() {
+        let test = " 123 / 3231 a";
+        let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
+        let expected: Result<Vec<Token>, String> = Err("Invalid char: /".to_owned());
+        assert_eq!(tokens, expected);
+    }
+}
