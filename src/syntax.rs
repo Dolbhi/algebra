@@ -11,8 +11,9 @@ pub enum Operation {
     Mult
 }
 
+#[derive(Debug)]
 pub enum ParseError {
-    Err
+    Err(String)
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -25,7 +26,8 @@ enum Token {
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
-        let tokens = convert_to_tokens(string).map_err(|_| ParseError::Err)?;
+        let tokens = convert_to_tokens(string).map_err(|err| ParseError::Err(err))?;
+        println!("Token stream: {:?}", tokens);
         Self::parse_tokens(&tokens.as_slice())
     }
 
@@ -56,7 +58,7 @@ impl SyntaxTree {
             }
             i += 1;
         }
-        result.ok_or(ParseError::Err)
+        result.ok_or(ParseError::Err("Unable to parse anything!".to_owned()))
     }
 
     /// Parses first valid tree of the token list, returning also the index of the last token parsed
@@ -67,7 +69,7 @@ impl SyntaxTree {
                 Self::parse_tokens(&tokens[1..closing_i-1]).map(|tree| (tree, closing_i))
             },
             Token::Var(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
-            _ => Err(ParseError::Err)
+            _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", tokens[0])))
         }
     }
 }
@@ -91,12 +93,14 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
                 // var start
                 current_var = Some(c.to_string());
             }
-            match c {
-                '(' => tokens.push(Token::OpenPeren),
-                ')' => tokens.push(Token::ClosePeren),
-                '*' => tokens.push(Token::Op(Operation::Mult)),
-                '+' => tokens.push(Token::Op(Operation::Add)),
-                _ => {invalid_char = Some(c); break;}
+            else {
+                match c {
+                    '(' => tokens.push(Token::OpenPeren),
+                    ')' => tokens.push(Token::ClosePeren),
+                    '*' => tokens.push(Token::Op(Operation::Mult)),
+                    '+' => tokens.push(Token::Op(Operation::Add)),
+                    _ => {invalid_char = Some(c); break;}
+                }
             }
         }
 
@@ -125,7 +129,7 @@ fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseEr
         }
         i += 1;
     }
-    Err(ParseError::Err)
+    Err(ParseError::Err(format!("Unable to find closing bracket, final depth: {:?}", depth)))
     // if depth != 0 {
     //     Err(ParseError::Err)
     // } else {
