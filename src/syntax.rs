@@ -1,10 +1,11 @@
+#[derive(Debug)]
 pub enum SyntaxTree {
     Var(String),
     Num(f32),
     Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>)
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Operation {
     Add,
     Mult
@@ -14,7 +15,7 @@ pub enum ParseError {
     Err
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 enum Token {
     Var(String),
     OpenPeren,
