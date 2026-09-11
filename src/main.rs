@@ -25,7 +25,7 @@ struct MyApp {
 
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::Panel::right(Id::new("right")).exact_size(200.0).show(ui, |ui| {
+        egui::Panel::right(Id::new("right")).resizable(false).exact_size(200.0).show(ui, |ui| {
             ui.heading("Side panel");
             ui.checkbox(&mut self.vars_editing, "Edit Vars");
             ui.with_layout(Layout::left_to_right(egui::Align::Min).with_main_wrap(true), |ui| {
