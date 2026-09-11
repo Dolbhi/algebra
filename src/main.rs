@@ -58,6 +58,9 @@ impl eframe::App for MyApp {
 
         egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("Output");
+            let mut job = egui::text::LayoutJob::default();
+            job.append("RICH TEXT", 0.0, egui::TextFormat {color: Color32::RED, underline: egui::Stroke { width: 2., color: Color32::BLACK}, .. egui::TextFormat::default()});
+            ui.add(egui::Label::new(job));
             ui.label(format!("The box says: {}", self.text_box_text));
         });
 
