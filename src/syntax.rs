@@ -23,6 +23,7 @@ pub enum Token {
     OpenPeren,
     ClosePeren,
     Op(Operation),
+    Eq,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct FloatEq(f32);
@@ -123,6 +124,7 @@ where I: Iterator<Item = char> {
         ')' => {chars.next(); Ok(Token::ClosePeren)},
         '*' => {chars.next(); Ok(Token::Op(Operation::Mult))},
         '+' => {chars.next(); Ok(Token::Op(Operation::Add))},
+        '=' => {chars.next(); Ok(Token::Eq)},
         _ => Err(format!("Invalid token first char: {}", first).to_owned())
     }
 }
@@ -149,6 +151,31 @@ fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseEr
     // } else {
     //     Ok()
     // }
+}
+
+pub fn tokens_to_string<'a>(tokens: impl IntoIterator<Item = &'a Token>) -> String {
+    tokens.into_iter().map(|t| t.to_string()).collect::<Vec<String>>().join(" ")
+}
+
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        match self {
+            Token::Variable(s) => s.clone(),
+            Token::Literal(FloatEq(num)) => num.to_string(),
+            Token::Op(operation) => operation.to_string(),
+            Token::OpenPeren => "(".to_string(),
+            Token::ClosePeren => ")".to_string(),
+            Token::Eq => "=".to_string(),
+        }
+    }
+}
+impl ToString for Operation {
+    fn to_string(&self) -> String {
+        match self {
+            Operation::Add => "+",
+            Operation::Mult => "*",
+        }.to_string()
+    }
 }
 
 impl PartialEq for FloatEq {
