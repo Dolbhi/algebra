@@ -19,6 +19,7 @@ pub enum ParseError {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Token {
     Variable(String),
+    /// literal numbers may end with a decimal ("1.") but not start with one (".1")
     Literal(FloatEq),
     OpenPeren,
     ClosePeren,
@@ -107,6 +108,7 @@ where I: Iterator<Item = char> {
     let first = chars.peek().ok_or("Cannot turn empty string into token".to_owned())?;
     match first {
         a if a.is_alphabetic() => {
+            // add variable
             let mut var = String::from(chars.next().unwrap());
             while let Some(c) = chars.next_if(|c| c.is_alphanumeric()) {
                 var.push(c);
@@ -114,8 +116,17 @@ where I: Iterator<Item = char> {
             Ok(Token::Variable(var))
         },
         n if n.is_numeric() => {
+            // add literal number
             let mut num = String::from(chars.next().unwrap());
-            while let Some(c) = chars.next_if(|c| c.is_numeric()) {
+            let mut point_used = false;
+            while let Some(c) = chars.next_if(|c| {
+                if !point_used && *c == '.' {
+                    point_used = true;
+                    true
+                } else {
+                    c.is_numeric()
+                }
+            }) {
                 num.push(c);
             }
             Ok(Token::Literal(num.parse::<f32>().map_err(|e| e.to_string())?.into()))
@@ -200,8 +211,20 @@ mod test {
     use super::*;
 
     #[test]
-    fn numeric_test() {
-        println!("{:?}", '.'.is_numeric()); // false
+    fn token_decimals() {
+        let test = "1.2x + 20.01y + 15.z";
+        let tokens = parse_tokens(test);
+        let expected = vec![
+            Token::Literal(1.2.into()),
+            Token::Variable("x".to_owned()), 
+            Token::Op(Operation::Add),
+            Token::Literal(20.01.into()),
+            Token::Variable("y".to_owned()),
+            Token::Op(Operation::Add),
+            Token::Literal(15.0.into()),
+            Token::Variable("z".to_owned()),
+        ];
+        assert_eq!(tokens, Ok(expected));
     }
 
     #[test]
