@@ -1,6 +1,6 @@
 use eframe::egui;
 use egui::{Color32, Id, Layout};
-use algebra::syntax;
+use algebra::syntax::{self, Token, parse_tokens, tokens_to_string};
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -23,6 +23,7 @@ struct MyApp {
     variables: Vec<String>,
     vars_editing: bool,
     edit_focused: bool,
+    expressions: Vec<Vec<Token>>,
 }
 
 impl eframe::App for MyApp {
@@ -59,8 +60,10 @@ impl eframe::App for MyApp {
                         }
                     },
                 );
-            });
+            }
+        );
 
+        // Bottom input
         let mut math_highlighter =
             |ui: &egui::Ui, string: &dyn egui::TextBuffer, wrap_width: f32| {
                 let mut job = egui::text::LayoutJob::default();
@@ -105,8 +108,11 @@ impl eframe::App for MyApp {
             .exact_size(120.0)
             .show(ui, |ui| {
                 ui.heading("Input");
-                if ui.button("Add as variable").clicked() {
-                    self.variables.push(self.text_box_text.clone());
+                if ui.button("Add expression").clicked() {
+                    if let Ok(tokens) = parse_tokens(&self.text_box_text) {
+                        self.expressions.push(tokens);
+                    }
+                    // self.variables.push(self.text_box_text.clone());
                 }
                 ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                     let text_box =
@@ -121,8 +127,10 @@ impl eframe::App for MyApp {
                     };
                     self.edit_focused = response.has_focus();
                 });
-            });
+            }
+        );
 
+        // Central workspace
         egui::CentralPanel::default().frame(egui::Frame::default().fill(Color32::LIGHT_GRAY).inner_margin(egui::Margin::symmetric(5, 5))).show(ui, |ui| {
             ui.heading("Central");
             let mut job = egui::text::LayoutJob::default();
@@ -144,6 +152,9 @@ impl eframe::App for MyApp {
                     .desired_rows(1)
                     .show(ui);
             });
+            for expression in &self.expressions {
+                ui.label(tokens_to_string(expression));
+            }
         });
     }
 }

@@ -30,7 +30,7 @@ pub struct FloatEq(f32);
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
-        let tokens = convert_to_tokens(string).map_err(|err| ParseError::Err(err))?;
+        let tokens = parse_tokens(string).map_err(|err| ParseError::Err(err))?;
         println!("Token stream: {:?}", tokens);
         Self::parse_tokens(&tokens.as_slice())
     }
@@ -79,7 +79,7 @@ impl SyntaxTree {
     }
 }
 
-fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
+pub fn parse_tokens(string: &str) -> Result<Vec<Token>, String> {
     let mut invalid_char = None;
     let result = string.split_whitespace().flat_map(|word| {
         let mut tokens = vec![];
@@ -207,7 +207,7 @@ mod test {
     #[test]
     fn token_simple() {
         let test = "a xy 1 32 ( ) * +";
-        let tokens = convert_to_tokens(test);
+        let tokens = parse_tokens(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
             Token::Variable("xy".to_owned()),
@@ -224,7 +224,7 @@ mod test {
     #[test]
     fn token_whitespace() {
         let test = " a b ab  1    abc 123      1 a 1 2";
-        let tokens = convert_to_tokens(test);
+        let tokens = parse_tokens(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
             Token::Variable("b".to_owned()),
@@ -243,7 +243,7 @@ mod test {
     #[test]
     fn token_no_whitespace() {
         let test = "whattheheckisthis123yes*2*5*me+(eea*ee)";
-        let tokens = convert_to_tokens(test);
+        let tokens = parse_tokens(test);
         let expected = vec![
             Token::Variable("whattheheckisthis123yes".to_owned()), 
             Token::Op(Operation::Mult),
@@ -265,7 +265,7 @@ mod test {
     #[test]
     fn token_literal_variable() {
         let test = "1a2";
-        let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
+        let tokens: Result<Vec<Token>, String> = parse_tokens(test);
         let expected = vec![
             Token::Literal(1.0.into()),
             Token::Variable("a2".to_owned()),
@@ -277,7 +277,7 @@ mod test {
     #[test]
     fn token_invalid_char() {
         let test = " 123 / 3231 a";
-        let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
+        let tokens: Result<Vec<Token>, String> = parse_tokens(test);
         let expected: Result<Vec<Token>, String> = Err("Invalid char: /".to_owned());
         println!("{:?}", tokens);
         assert_eq!(tokens, expected);
