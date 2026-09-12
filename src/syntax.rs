@@ -17,12 +17,15 @@ pub enum ParseError {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-enum Token {
-    Var(String),
+pub enum Token {
+    Variable(String),
+    Literal(FloatEq),
     OpenPeren,
     ClosePeren,
     Op(Operation),
 }
+#[derive(Clone, Copy, Debug)]
+pub struct FloatEq(f32);
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
@@ -69,7 +72,7 @@ impl SyntaxTree {
                 let closing_i = find_closing_bracket(tokens, 0)?;
                 Self::parse_tokens(&tokens[1..closing_i]).map(|tree| (tree, closing_i))
             },
-            Token::Var(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
+            Token::Variable(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
             _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", tokens[0])))
         }
     }
@@ -88,7 +91,7 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
                     current_var = Some(var);
                 } else {
                     // var name end, push as token
-                    tokens.push(Token::Var(var));
+                    tokens.push(Token::Variable(var));
                     // not a name/value
                     match c {
                     '(' => tokens.push(Token::OpenPeren),
@@ -115,7 +118,7 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
         }
         // word end, push cached name as var
         if let Some(var) = current_var {
-            tokens.push(Token::Var(var));
+            tokens.push(Token::Variable(var));
         }
 
         tokens
@@ -151,6 +154,23 @@ fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseEr
     // }
 }
 
+impl PartialEq for FloatEq {
+    fn eq(&self, other: &Self) -> bool {
+        (self.0 - other.0) < f32::EPSILON
+    }
+}
+impl Eq for FloatEq {}
+impl From<f32> for FloatEq {
+    fn from(value: f32) -> Self {
+        FloatEq(value)
+    }
+}
+impl Into<f32> for FloatEq {
+    fn into(self) -> f32 {
+        self.0
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -160,10 +180,10 @@ mod test {
         let test = "a xy 1 32 ( ) * +";
         let tokens = convert_to_tokens(test);
         let expected = vec![
-            Token::Var("a".to_owned()), 
-            Token::Var("xy".to_owned()),
-            Token::Var("1".to_owned()),
-            Token::Var("32".to_owned()),
+            Token::Variable("a".to_owned()), 
+            Token::Variable("xy".to_owned()),
+            Token::Variable("1".to_owned()),
+            Token::Variable("32".to_owned()),
             Token::OpenPeren,
             Token::ClosePeren,
             Token::Op(Operation::Mult),
@@ -177,16 +197,16 @@ mod test {
         let test = " a b ab  1    abc 123      1 a 1 2";
         let tokens = convert_to_tokens(test);
         let expected = vec![
-            Token::Var("a".to_owned()), 
-            Token::Var("b".to_owned()),
-            Token::Var("ab".to_owned()),
-            Token::Var("1".to_owned()),
-            Token::Var("abc".to_owned()),
-            Token::Var("123".to_owned()),
-            Token::Var("1".to_owned()),
-            Token::Var("a".to_owned()),
-            Token::Var("1".to_owned()),
-            Token::Var("2".to_owned()),
+            Token::Variable("a".to_owned()), 
+            Token::Variable("b".to_owned()),
+            Token::Variable("ab".to_owned()),
+            Token::Variable("1".to_owned()),
+            Token::Variable("abc".to_owned()),
+            Token::Variable("123".to_owned()),
+            Token::Variable("1".to_owned()),
+            Token::Variable("a".to_owned()),
+            Token::Variable("1".to_owned()),
+            Token::Variable("2".to_owned()),
         ];
         assert_eq!(tokens, Ok(expected));
     }
@@ -196,18 +216,18 @@ mod test {
         let test = "whattheheckisthis123yes*2*5*me+(eea*ee)";
         let tokens = convert_to_tokens(test);
         let expected = vec![
-            Token::Var("whattheheckisthis123yes".to_owned()), 
+            Token::Variable("whattheheckisthis123yes".to_owned()), 
             Token::Op(Operation::Mult),
-            Token::Var("2".to_owned()),
+            Token::Variable("2".to_owned()),
             Token::Op(Operation::Mult),
-            Token::Var("5".to_owned()),
+            Token::Variable("5".to_owned()),
             Token::Op(Operation::Mult),
-            Token::Var("me".to_owned()),
+            Token::Variable("me".to_owned()),
             Token::Op(Operation::Add),
             Token::OpenPeren,
-            Token::Var("eea".to_owned()),
+            Token::Variable("eea".to_owned()),
             Token::Op(Operation::Mult),
-            Token::Var("ee".to_owned()),
+            Token::Variable("ee".to_owned()),
             Token::ClosePeren,
         ];
         assert_eq!(tokens, Ok(expected));
