@@ -82,43 +82,15 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
     let mut invalid_char = None;
     let result = string.split_whitespace().flat_map(|word| {
         let mut tokens = vec![];
-        let mut current_var: Option<String> = None;
-        for c in word.chars() {
-            if let Some(mut var) = current_var.take() {
-                if c.is_alphanumeric() {
-                    // extend var name
-                    var.push(c);
-                    current_var = Some(var);
-                } else {
-                    // var name end, push as token
-                    tokens.push(Token::Variable(var));
-                    // not a name/value
-                    match c {
-                    '(' => tokens.push(Token::OpenPeren),
-                    ')' => tokens.push(Token::ClosePeren),
-                    '*' => tokens.push(Token::Op(Operation::Mult)),
-                    '+' => tokens.push(Token::Op(Operation::Add)),
-                    _ => {invalid_char = Some(c); break;}
-                }
-                }
-            } else if c.is_alphanumeric() {
-                // var start
-                current_var = Some(c.to_string());
-            }
-            else {
-                // not a name/value
-                match c {
-                    '(' => tokens.push(Token::OpenPeren),
-                    ')' => tokens.push(Token::ClosePeren),
-                    '*' => tokens.push(Token::Op(Operation::Mult)),
-                    '+' => tokens.push(Token::Op(Operation::Add)),
-                    _ => {invalid_char = Some(c); break;}
-                }
-            }
+        let mut chars = word.chars().peekable();
+
+        while let Ok(token) = tokanise_top(&mut chars) {
+            tokens.push(token);
         }
-        // word end, push cached name as var
-        if let Some(var) = current_var {
-            tokens.push(Token::Variable(var));
+
+        // any chars left are invalid
+        if invalid_char.is_none() {
+            invalid_char = chars.next();
         }
 
         tokens
@@ -127,6 +99,31 @@ fn convert_to_tokens(string: &str) -> Result<Vec<Token>, String> {
         Err(format!("Invalid char: {}", c))
     } else {
         Ok(result)
+    }
+}
+fn tokanise_top<I>(chars: &mut core::iter::Peekable<I>) -> Result<Token, String>
+where I: Iterator<Item = char> {
+    let first = chars.peek().ok_or("Cannot turn empty string into token".to_owned())?;
+    match first {
+        a if a.is_alphabetic() => {
+            let mut var = String::from(chars.next().unwrap());
+            while let Some(c) = chars.next_if(|c| c.is_alphanumeric()) {
+                var.push(c);
+            }
+            Ok(Token::Variable(var))
+        },
+        n if n.is_numeric() => {
+            let mut num = String::from(chars.next().unwrap());
+            while let Some(c) = chars.next_if(|c| c.is_numeric()) {
+                num.push(c);
+            }
+            Ok(Token::Literal(num.parse::<f32>().map_err(|e| e.to_string())?.into()))
+        },
+        '(' => {chars.next(); Ok(Token::OpenPeren)},
+        ')' => {chars.next(); Ok(Token::ClosePeren)},
+        '*' => {chars.next(); Ok(Token::Op(Operation::Mult))},
+        '+' => {chars.next(); Ok(Token::Op(Operation::Add))},
+        _ => Err(format!("Invalid token first char: {}", first).to_owned())
     }
 }
 
@@ -176,14 +173,19 @@ mod test {
     use super::*;
 
     #[test]
+    fn numeric_test() {
+        println!("{:?}", '.'.is_numeric()); // false
+    }
+
+    #[test]
     fn token_simple() {
         let test = "a xy 1 32 ( ) * +";
         let tokens = convert_to_tokens(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
             Token::Variable("xy".to_owned()),
-            Token::Variable("1".to_owned()),
-            Token::Variable("32".to_owned()),
+            Token::Literal(1.0.into()),
+            Token::Literal(32.0.into()),
             Token::OpenPeren,
             Token::ClosePeren,
             Token::Op(Operation::Mult),
@@ -200,13 +202,13 @@ mod test {
             Token::Variable("a".to_owned()), 
             Token::Variable("b".to_owned()),
             Token::Variable("ab".to_owned()),
-            Token::Variable("1".to_owned()),
+            Token::Literal(1.0.into()),
             Token::Variable("abc".to_owned()),
-            Token::Variable("123".to_owned()),
-            Token::Variable("1".to_owned()),
+            Token::Literal(123.0.into()),
+            Token::Literal(1.0.into()),
             Token::Variable("a".to_owned()),
-            Token::Variable("1".to_owned()),
-            Token::Variable("2".to_owned()),
+            Token::Literal(1.0.into()),
+            Token::Literal(2.0.into()),
         ];
         assert_eq!(tokens, Ok(expected));
     }
@@ -218,9 +220,9 @@ mod test {
         let expected = vec![
             Token::Variable("whattheheckisthis123yes".to_owned()), 
             Token::Op(Operation::Mult),
-            Token::Variable("2".to_owned()),
+            Token::Literal(2.0.into()),
             Token::Op(Operation::Mult),
-            Token::Variable("5".to_owned()),
+            Token::Literal(5.0.into()),
             Token::Op(Operation::Mult),
             Token::Variable("me".to_owned()),
             Token::Op(Operation::Add),
@@ -233,13 +235,16 @@ mod test {
         assert_eq!(tokens, Ok(expected));
     }
 
-    // #[test]
-    // fn token_invalid_name() {
-    //     let test = "1a";
-    //     let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
-    //     let expected: Result<Vec<Token>, String> = Err("Invalid var name: 1a".to_owned());
-    //     assert_eq!(tokens, expected);
-    // }
+    #[test]
+    fn token_literal_variable() {
+        let test = "1a2";
+        let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
+        let expected = vec![
+            Token::Literal(1.0.into()),
+            Token::Variable("a2".to_owned()),
+        ];
+        assert_eq!(tokens, Ok(expected));
+    }
 
 
     #[test]
@@ -247,6 +252,7 @@ mod test {
         let test = " 123 / 3231 a";
         let tokens: Result<Vec<Token>, String> = convert_to_tokens(test);
         let expected: Result<Vec<Token>, String> = Err("Invalid char: /".to_owned());
+        println!("{:?}", tokens);
         assert_eq!(tokens, expected);
     }
 }
