@@ -36,10 +36,10 @@ impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
         let tokens = tokanise_string(string).map_err(|err| ParseError::Err(err))?;
         println!("Token stream: {:?}", tokens);
-        Self::parse_tokens(tokens.into())
+        Self::from_tokens(tokens.into())
     }
 
-    fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Box<Self>, ParseError> {
+    fn from_tokens(mut tokens: VecDeque<Token>) -> Result<Box<Self>, ParseError> {
         let mut result: Option<Box<SyntaxTree>> = None;
         while let Some(token) = tokens.front() {
             match token {
@@ -47,7 +47,7 @@ impl SyntaxTree {
                     let token = token.clone();
                     tokens.pop_front();
                     if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::parse_tokens(tokens)?)))
+                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::from_tokens(tokens)?)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
@@ -56,7 +56,7 @@ impl SyntaxTree {
                     let token = token.clone();
                     tokens.pop_front();
                     if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Eq(prev, Self::parse_tokens(tokens)?)))
+                        return Ok(Box::new(SyntaxTree::Eq(prev, Self::from_tokens(tokens)?)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
@@ -94,7 +94,7 @@ impl SyntaxTree {
                     let mut temp = tokens.split_off(find_closing_bracket(tokens.as_slices().0, 0)?);
                     temp.pop_front();
                     std::mem::swap(tokens, &mut temp);
-                    Self::parse_tokens(temp)
+                    Self::from_tokens(temp)
                 },
                 Token::Variable(string) => {
                     let string = string.clone();
