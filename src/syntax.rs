@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 #[derive(Debug)]
 pub enum SyntaxTree {
     Var(String),
@@ -32,56 +34,87 @@ pub struct FloatEq(f32);
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
-        let tokens = parse_tokens(string).map_err(|err| ParseError::Err(err))?;
+        let tokens = tokanise_string(string).map_err(|err| ParseError::Err(err))?;
         println!("Token stream: {:?}", tokens);
-        Self::parse_tokens(&tokens.as_slice())
+        Self::parse_tokens(tokens.into())
     }
 
-    fn parse_tokens(tokens: &[Token]) -> Result<Box<Self>, ParseError> {
+    fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Box<Self>, ParseError> {
         let mut result: Option<Box<SyntaxTree>> = None;
-        let mut i = 0;
-        while i < tokens.len() {
-            let next_expr = Self::parse_top(&tokens[i..tokens.len()]);
-            if let Some(prev) = result.take() {
-                if let Ok((next, end_i)) = next_expr {
-                    // implied mult (no operator)
-                    result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
-                    i += end_i;
-                } else if let Token::Op(Operation::Add) = tokens[i] {
-                    // addition
-                    let next = Self::parse_tokens(&tokens[i+1..tokens.len()])?;
-                    result = Some(Box::new(SyntaxTree::Op(Operation::Add, prev, next)));
-                    i = tokens.len();
-                } else if let Token::Op(Operation::Mult) = tokens[i] {
-                    // multiplication
-                    let (next, end_i) = Self::parse_top(&tokens[i+1..tokens.len()])?;
-                    result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)));
-                    i += 1 + end_i;
+        while let Some(token) = tokens.front() {
+            match token {
+                Token::Op(Operation::Add) => {
+                    let token = token.clone();
+                    tokens.pop_front();
+                    if let Some(prev) = result {
+                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::parse_tokens(tokens)?)))
+                    } else {
+                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
+                    }
+                },
+                Token::Eq => {
+                    let token = token.clone();
+                    tokens.pop_front();
+                    if let Some(prev) = result {
+                        return Ok(Box::new(SyntaxTree::Eq(prev, Self::parse_tokens(tokens)?)))
+                    } else {
+                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
+                    }
+                },
+                Token::Op(Operation::Mult) => {
+                    let token = token.clone();
+                    tokens.pop_front();
+                    if let Some(prev) = result {
+                        result = Some(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::parse_top(&mut tokens)?)))
+                    } else {
+                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
+                    }
+                },
+                _ => {
+                    tokens.pop_front();
+                    let next = Self::parse_top(&mut tokens)?;
+                    if let Some(prev) = result {
+                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)))
+                    } else {
+                        result = Some(next)
+                    }
                 }
-            } else {
-                // truly first expression
-                result = Some(next_expr?.0);
             }
-            // println!("Partial result: {:?}", result);
-            i += 1;
         }
         result.ok_or(ParseError::Err("Unable to parse anything!".to_owned()))
     }
 
     /// Parses first valid tree of the token list, returning also the index of the last token parsed
-    fn parse_top(tokens: &[Token]) -> Result<(Box<Self>, usize), ParseError> {
-        match &tokens[0] {
-            Token::OpenPeren => {
-                let closing_i = find_closing_bracket(tokens, 0)?;
-                Self::parse_tokens(&tokens[1..closing_i]).map(|tree| (tree, closing_i))
-            },
-            Token::Variable(string) => Ok((Box::new(SyntaxTree::Var(string.clone())), 0)),
-            _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", tokens[0])))
+    fn parse_top(tokens: &mut VecDeque<Token>) -> Result<Box<Self>, ParseError> {
+        if let Some(first) = tokens.front() {
+            match first {
+                Token::OpenPeren => {
+                    tokens.pop_front();
+                    tokens.make_contiguous();
+                    let mut temp = tokens.split_off(find_closing_bracket(tokens.as_slices().0, 0)?);
+                    temp.pop_front();
+                    std::mem::swap(tokens, &mut temp);
+                    Self::parse_tokens(temp)
+                },
+                Token::Variable(string) => {
+                    let string = string.clone();
+                    tokens.pop_front();
+                    Ok(Box::new(SyntaxTree::Var(string.clone())))
+                },
+                Token::Literal(val) => {
+                    let val = *val;
+                    tokens.pop_front();
+                    Ok(Box::new(SyntaxTree::Num(val.into())))
+                },
+                _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", first)))
+            }
+        } else {
+            Err(ParseError::Err("Unable to parse empty token stream".to_owned()))
         }
     }
 }
 
-pub fn parse_tokens(string: &str) -> Result<Vec<Token>, String> {
+pub fn tokanise_string(string: &str) -> Result<Vec<Token>, String> {
     let mut invalid_char = None;
     let result = string.split_whitespace().flat_map(|word| {
         let mut tokens = vec![];
@@ -214,7 +247,7 @@ mod test {
     #[test]
     fn token_decimals() {
         let test = "1.2x + 20.01y + 15.z";
-        let tokens = parse_tokens(test);
+        let tokens = tokanise_string(test);
         let expected = vec![
             Token::Literal(1.2.into()),
             Token::Variable("x".to_owned()), 
@@ -231,7 +264,7 @@ mod test {
     #[test]
     fn token_simple() {
         let test = "a xy 1 32 ( ) * +";
-        let tokens = parse_tokens(test);
+        let tokens = tokanise_string(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
             Token::Variable("xy".to_owned()),
@@ -248,7 +281,7 @@ mod test {
     #[test]
     fn token_whitespace() {
         let test = " a b ab  1    abc 123      1 a 1 2";
-        let tokens = parse_tokens(test);
+        let tokens = tokanise_string(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
             Token::Variable("b".to_owned()),
@@ -267,7 +300,7 @@ mod test {
     #[test]
     fn token_no_whitespace() {
         let test = "whattheheckisthis123yes*2*5*me+(eea*ee)";
-        let tokens = parse_tokens(test);
+        let tokens = tokanise_string(test);
         let expected = vec![
             Token::Variable("whattheheckisthis123yes".to_owned()), 
             Token::Op(Operation::Mult),
@@ -289,7 +322,7 @@ mod test {
     #[test]
     fn token_literal_variable() {
         let test = "1a2";
-        let tokens: Result<Vec<Token>, String> = parse_tokens(test);
+        let tokens: Result<Vec<Token>, String> = tokanise_string(test);
         let expected = vec![
             Token::Literal(1.0.into()),
             Token::Variable("a2".to_owned()),
@@ -301,7 +334,7 @@ mod test {
     #[test]
     fn token_invalid_char() {
         let test = " 123 / 3231 a";
-        let tokens: Result<Vec<Token>, String> = parse_tokens(test);
+        let tokens: Result<Vec<Token>, String> = tokanise_string(test);
         let expected: Result<Vec<Token>, String> = Err("Invalid char: /".to_owned());
         println!("{:?}", tokens);
         assert_eq!(tokens, expected);

@@ -1,6 +1,6 @@
 use eframe::egui;
 use egui::{Color32, Id, Layout};
-use algebra::syntax::{self, Token, parse_tokens, tokens_to_string};
+use algebra::syntax::{self, Token, tokanise_string, tokens_to_string};
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -109,7 +109,7 @@ impl eframe::App for MyApp {
             .show(ui, |ui| {
                 ui.heading("Input");
                 if ui.button("Add expression").clicked() {
-                    if let Ok(tokens) = parse_tokens(&self.text_box_text) {
+                    if let Ok(tokens) = tokanise_string(&self.text_box_text) {
                         self.expressions.push(tokens);
                     }
                     // self.variables.push(self.text_box_text.clone());
