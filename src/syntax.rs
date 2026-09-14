@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 #[derive(Debug)]
 pub enum SyntaxTree {
     Var(String),
@@ -36,45 +34,46 @@ impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
         let tokens = tokanise_string(string).map_err(|err| ParseError::Err(err))?;
         println!("Token stream: {:?}", tokens);
-        Self::from_tokens(tokens.into())
+        Self::from_tokens(tokens)
     }
 
-    fn from_tokens(mut tokens: VecDeque<Token>) -> Result<Box<Self>, ParseError> {
+    /// parses tokens back to front
+    fn from_tokens(mut tokens: Vec<Token>) -> Result<Box<Self>, ParseError> {
         let mut result: Option<Box<SyntaxTree>> = None;
-        while let Some(token) = tokens.front() {
+        while let Some(token) = tokens.last() {
             match token {
                 Token::Op(Operation::Add) => {
                     let token = token.clone();
-                    tokens.pop_front();
+                    tokens.pop();
                     if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::from_tokens(tokens)?)))
+                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, Self::from_tokens(tokens)?, prev)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
                 },
                 Token::Eq => {
                     let token = token.clone();
-                    tokens.pop_front();
+                    tokens.pop();
                     if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Eq(prev, Self::from_tokens(tokens)?)))
+                        return Ok(Box::new(SyntaxTree::Eq(Self::from_tokens(tokens)?, prev)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
                 },
                 Token::Op(Operation::Mult) => {
                     let token = token.clone();
-                    tokens.pop_front();
+                    tokens.pop();
                     if let Some(prev) = result {
-                        result = Some(Box::new(SyntaxTree::Op(Operation::Add, prev, Self::parse_top(&mut tokens)?)))
+                        result = Some(Box::new(SyntaxTree::Op(Operation::Add, Self::parse_back(&mut tokens)?, prev)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
                 },
                 _ => {
-                    tokens.pop_front();
-                    let next = Self::parse_top(&mut tokens)?;
+                    // tokens.pop();
+                    let next = Self::parse_back(&mut tokens)?;
                     if let Some(prev) = result {
-                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, prev, next)))
+                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, next, prev)))
                     } else {
                         result = Some(next)
                     }
@@ -85,25 +84,24 @@ impl SyntaxTree {
     }
 
     /// Parses first valid tree of the token list, returning also the index of the last token parsed
-    fn parse_top(tokens: &mut VecDeque<Token>) -> Result<Box<Self>, ParseError> {
-        if let Some(first) = tokens.front() {
+    fn parse_back(tokens: &mut Vec<Token>) -> Result<Box<Self>, ParseError> {
+        if let Some(first) = tokens.last() {
             match first {
                 Token::OpenPeren => {
-                    tokens.pop_front();
-                    tokens.make_contiguous();
-                    let mut temp = tokens.split_off(find_closing_bracket(tokens.as_slices().0, 0)?);
-                    temp.pop_front();
+                    tokens.pop();
+                    let mut temp = tokens.split_off(find_openning_bracket(tokens.as_slice())? + 1);
+                    temp.pop();
                     std::mem::swap(tokens, &mut temp);
                     Self::from_tokens(temp)
                 },
                 Token::Variable(string) => {
                     let string = string.clone();
-                    tokens.pop_front();
+                    tokens.pop();
                     Ok(Box::new(SyntaxTree::Var(string.clone())))
                 },
                 Token::Literal(val) => {
                     let val = *val;
-                    tokens.pop_front();
+                    tokens.pop();
                     Ok(Box::new(SyntaxTree::Num(val.into())))
                 },
                 _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", first)))
@@ -174,28 +172,42 @@ where I: Iterator<Item = char> {
     }
 }
 
-/// Assumes `start` is the index of opening bracket, returns index of closing bracket
-fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseError> {
-    let mut depth = 1;
-    let mut i = start + 1;
-    while i < tokens.len() {
-        let token = &tokens[i];
-        if *token == Token::OpenPeren {
-            depth += 1;
-        } else if *token == Token::ClosePeren {
-            depth -= 1;
-            if depth == 0 {
-                return Ok(i);
-            }
+// /// Assumes `start` is the index of opening bracket, returns index of closing bracket
+// fn find_closing_bracket(tokens: &[Token], start: usize) -> Result<usize, ParseError> {
+//     let mut depth = 1;
+//     let mut i = start + 1;
+//     while i < tokens.len() {
+//         let token = &tokens[i];
+//         if *token == Token::OpenPeren {
+//             depth += 1;
+//         } else if *token == Token::ClosePeren {
+//             depth -= 1;
+//             if depth == 0 {
+//                 return Ok(i);
+//             }
+//         }
+//         i += 1;
+//     }
+//     Err(ParseError::Err(format!("Unable to find closing bracket, final depth: {:?}", depth)))
+//     // if depth != 0 {
+//     //     Err(ParseError::Err)
+//     // } else {
+//     //     Ok()
+//     // }
+// }
+
+/// Assumes closing bracket has already been removed
+fn find_openning_bracket(tokens: &[Token]) -> Result<usize, ParseError> {
+    let mut tokens = tokens.iter().enumerate().rev();
+    let mut depth: usize = 1;
+    while let Some((i, token)) = tokens.next() {
+        match token {
+            Token::ClosePeren => depth += 1,
+            Token::OpenPeren => {depth -= 1; if depth == 0 {return Ok(i);}},
+            _ => {}
         }
-        i += 1;
     }
-    Err(ParseError::Err(format!("Unable to find closing bracket, final depth: {:?}", depth)))
-    // if depth != 0 {
-    //     Err(ParseError::Err)
-    // } else {
-    //     Ok()
-    // }
+    return Err(ParseError::Err("Unable to find corresponding closing bracket".to_owned()));
 }
 
 pub fn tokens_to_string<'a>(tokens: impl IntoIterator<Item = &'a Token>) -> String {
