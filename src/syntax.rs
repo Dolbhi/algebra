@@ -64,7 +64,7 @@ impl SyntaxTree {
                     let token = token.clone();
                     tokens.pop();
                     if let Some(prev) = result {
-                        result = Some(Box::new(SyntaxTree::Op(Operation::Add, Self::parse_back(&mut tokens)?, prev)))
+                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, Self::parse_back(&mut tokens)?, prev)))
                     } else {
                         return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
                     }
@@ -85,14 +85,13 @@ impl SyntaxTree {
 
     /// Parses first valid tree of the token list, returning also the index of the last token parsed
     fn parse_back(tokens: &mut Vec<Token>) -> Result<Box<Self>, ParseError> {
-        if let Some(first) = tokens.last() {
-            match first {
-                Token::OpenPeren => {
+        if let Some(last) = tokens.last() {
+            match last {
+                Token::ClosePeren => {
                     tokens.pop();
-                    let mut temp = tokens.split_off(find_openning_bracket(tokens.as_slice())? + 1);
-                    temp.pop();
-                    std::mem::swap(tokens, &mut temp);
-                    Self::from_tokens(temp)
+                    let in_parens = tokens.split_off(find_openning_bracket(tokens.as_slice())? + 1);
+                    tokens.pop(); // remove openning paren leftover
+                    Self::from_tokens(in_parens)
                 },
                 Token::Variable(string) => {
                     let string = string.clone();
@@ -104,7 +103,7 @@ impl SyntaxTree {
                     tokens.pop();
                     Ok(Box::new(SyntaxTree::Num(val.into())))
                 },
-                _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", first)))
+                _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", last)))
             }
         } else {
             Err(ParseError::Err("Unable to parse empty token stream".to_owned()))
@@ -257,6 +256,20 @@ mod test {
     use super::*;
 
     #[test]
+    fn syntax_test() {
+        let test = "11 + 22 * 33";
+        let tree = SyntaxTree::parse(test).unwrap();
+        println!("{:?}", tree);
+    }
+
+    #[test]
+    fn syntax_parens() {
+        let test = "11 + (33 + (4 * 5))";
+        let tree = SyntaxTree::parse(test).unwrap();
+        println!("{:?}", tree);
+    }
+
+    #[test]
     fn token_decimals() {
         let test = "1.2x + 20.01y + 15.z";
         let tokens = tokanise_string(test);
@@ -275,7 +288,7 @@ mod test {
 
     #[test]
     fn token_simple() {
-        let test = "a xy 1 32 ( ) * +";
+        let test = "a xy 1 32 ( = ) * +";
         let tokens = tokanise_string(test);
         let expected = vec![
             Token::Variable("a".to_owned()), 
@@ -283,6 +296,7 @@ mod test {
             Token::Literal(1.0.into()),
             Token::Literal(32.0.into()),
             Token::OpenPeren,
+            Token::Eq,
             Token::ClosePeren,
             Token::Op(Operation::Mult),
             Token::Op(Operation::Add),
