@@ -41,6 +41,52 @@ impl SyntaxTree {
 
     /// parses tokens back to front
     fn from_tokens(mut tokens: Vec<Token>) -> Result<Box<Self>, ParseError> {
+        // let mut depth = 0;
+        // let mut exprs = tokens.split(|token| {
+        //     match token {
+        //         Token::OpenPeren => {
+        //             depth += 1;
+        //             depth == 1
+        //         },
+        //         Token::ClosePeren => {
+        //             depth -= 1;
+        //             depth == 0
+        //         },
+        //         _ => false
+        //     }
+        // }).filter(|stream| !stream.is_empty());
+        // if depth != 0 {return Err(ParseError::Err(format!("Parentheses error, depth: {:?}", depth)));}
+
+        /*
+        
+        tokens.split(sub).fold(|expr, last| {
+            Op(
+                Sub,
+                expr.split(add).fold(|expr, last| {
+                    Op(
+                        Add,
+                        expr.split(mul).fold(|expr, last| {
+                            Op(
+                                Mul,
+                                expr.split(mul).fold(|expr, last| {
+                                    Op(
+                                        Mul,
+
+                                        
+                                    )
+                                }),
+                                last
+                            )
+                        }),
+                        last
+                    )
+                }),
+                last
+            )
+        })
+
+         */
+
         let mut result: Option<Box<SyntaxTree>> = None;
         while let Some(token) = tokens.last() {
             match token {
@@ -172,6 +218,44 @@ where I: Iterator<Item = char> {
         '/' => {chars.next(); Ok(Token::Op(Operation::Div))},
         '=' => {chars.next(); Ok(Token::Eq)},
         _ => Err(format!("Invalid token first char: {}", first).to_owned())
+    }
+}
+
+fn insert_impl_mult(tokens: &mut Vec<Token>) {
+    if tokens.len() < 2 {
+        return;
+    }
+
+    let mut i = 1;
+    let mut prev_expr = match tokens[0] {
+        Token::ClosePeren | Token::Literal(_) | Token::Variable(_) => true,
+        _ => false
+    };
+    while i < tokens.len() {
+        match tokens[i] {
+            Token::Literal(_) | Token::Variable(_) => {
+                // expr, impl mult before/after is possible
+                if prev_expr {
+                    tokens.insert(i, Token::Op(Operation::Mult));
+                    i += 1;
+                }
+                prev_expr = true;
+            },
+            Token::OpenPeren => {
+                // start of expr, impl mult before is possible
+                if prev_expr {
+                    tokens.insert(i, Token::Op(Operation::Mult));
+                    i += 1;
+                }
+                prev_expr = false;
+            },
+            Token::ClosePeren => {
+                // end of expr, impl mult after is possible
+                prev_expr = true;
+            },
+            _ => {prev_expr = false;}
+        };
+        i += 1;
     }
 }
 
