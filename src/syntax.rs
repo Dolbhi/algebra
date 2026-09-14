@@ -2,7 +2,8 @@
 pub enum SyntaxTree {
     Var(String),
     Num(f32),
-    Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>)
+    Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>),
+    Eq(Box<SyntaxTree>, Box<SyntaxTree>)
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
