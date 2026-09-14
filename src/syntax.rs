@@ -34,128 +34,68 @@ pub struct FloatEq(f32);
 
 impl SyntaxTree {
     pub fn parse(string: &str) -> Result<Box<Self>, ParseError> {
-        let tokens = tokanise_string(string).map_err(|err| ParseError::Err(err))?;
+        let mut tokens = tokanise_string(string).map_err(|err| ParseError::Err(err))?;
         println!("Token stream: {:?}", tokens);
-        Self::from_tokens(tokens)
+        insert_impl_mult(&mut tokens);
+
+        let mut depth = 0;
+        let tokens_with_depth = tokens.into_iter().map(|token| {
+            match token {
+                Token::OpenPeren => {depth += 1},
+                Token::ClosePeren => {depth -= 1},
+                _ => {}
+            }
+            (token, depth)
+        }).collect::<Vec<(Token, usize)>>();
+
+        Self::from_tokens(tokens_with_depth, 0)
     }
 
     /// parses tokens back to front
-    fn from_tokens(mut tokens: Vec<Token>) -> Result<Box<Self>, ParseError> {
-        // let mut depth = 0;
-        // let mut exprs = tokens.split(|token| {
-        //     match token {
-        //         Token::OpenPeren => {
-        //             depth += 1;
-        //             depth == 1
-        //         },
-        //         Token::ClosePeren => {
-        //             depth -= 1;
-        //             depth == 0
-        //         },
-        //         _ => false
-        //     }
-        // }).filter(|stream| !stream.is_empty());
-        // if depth != 0 {return Err(ParseError::Err(format!("Parentheses error, depth: {:?}", depth)));}
+    fn from_tokens(tokens: Vec<(Token, usize)>, current_depth: usize) -> Result<Box<Self>, ParseError> {
+        tokens.split(|token| *token == (Token::Op(Operation::Neg), current_depth)).try_fold(None, |last, substream| {
+            let next = substream.split(|token| *token == (Token::Op(Operation::Add), current_depth)).try_fold(None, |last, substream| {
+                let next = substream.split(|token| *token == (Token::Op(Operation::Mult), current_depth)).try_fold(None, |last, substream| {
+                    let next = substream.split(|token| *token == (Token::Op(Operation::Div), current_depth)).try_fold(None, |last, substream| {
+                        let next = if substream.len() == 1 {
+                            let token = &substream.first().unwrap().0;
+                            let tree = match token {
+                                Token::Literal(val) => SyntaxTree::Num((*val).into()),
+                                Token::Variable(var) => SyntaxTree::Var(var.clone()),
+                                _ => return Err(ParseError::Err(format!("Invalid token: {:?}", token)))
+                            };
+                            Box::new(tree)
+                        } else {
+                            Self::from_tokens(substream.into_iter().map(|t| t.clone()).collect(), current_depth + 1)?
+                        };
 
-        /*
-        
-        tokens.split(sub).fold(|expr, last| {
-            Op(
-                Sub,
-                expr.split(add).fold(|expr, last| {
-                    Op(
-                        Add,
-                        expr.split(mul).fold(|expr, last| {
-                            Op(
-                                Mul,
-                                expr.split(mul).fold(|expr, last| {
-                                    Op(
-                                        Mul,
+                        if let Some(last) = last {
+                            Ok(Some(Box::new(SyntaxTree::Op(Operation::Div, last, next))))
+                        } else {
+                            Ok(Some(next))
+                        }
 
-                                        
-                                    )
-                                }),
-                                last
-                            )
-                        }),
-                        last
-                    )
-                }),
-                last
-            )
-        })
+                    })?.ok_or(ParseError::Err(format!("Invalid token: {:?}", Token::Op(Operation::Div))))?;
+                    if let Some(last) = last {
+                        Ok(Some(Box::new(SyntaxTree::Op(Operation::Mult, last, next))))
+                    } else {
+                        Ok(Some(next))
+                    }
 
-         */
-
-        let mut result: Option<Box<SyntaxTree>> = None;
-        while let Some(token) = tokens.last() {
-            match token {
-                Token::Op(Operation::Add) => {
-                    let token = token.clone();
-                    tokens.pop();
-                    if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Op(Operation::Add, Self::from_tokens(tokens)?, prev)))
-                    } else {
-                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
-                    }
-                },
-                Token::Eq => {
-                    let token = token.clone();
-                    tokens.pop();
-                    if let Some(prev) = result {
-                        return Ok(Box::new(SyntaxTree::Eq(Self::from_tokens(tokens)?, prev)))
-                    } else {
-                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
-                    }
-                },
-                Token::Op(Operation::Mult) => {
-                    let token = token.clone();
-                    tokens.pop();
-                    if let Some(prev) = result {
-                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, Self::parse_back(&mut tokens)?, prev)))
-                    } else {
-                        return Err(ParseError::Err(format!("Invalid token: {:?}", token)));
-                    }
-                },
-                _ => {
-                    // tokens.pop();
-                    let next = Self::parse_back(&mut tokens)?;
-                    if let Some(prev) = result {
-                        result = Some(Box::new(SyntaxTree::Op(Operation::Mult, next, prev)))
-                    } else {
-                        result = Some(next)
-                    }
+                })?.ok_or(ParseError::Err(format!("Invalid token: {:?}", Token::Op(Operation::Mult))))?;
+                if let Some(last) = last {
+                    Ok(Some(Box::new(SyntaxTree::Op(Operation::Add, last, next))))
+                } else {
+                    Ok(Some(next))
                 }
-            }
-        }
-        result.ok_or(ParseError::Err("Unable to parse anything!".to_owned()))
-    }
 
-    /// Parses first valid tree of the token list, returning also the index of the last token parsed
-    fn parse_back(tokens: &mut Vec<Token>) -> Result<Box<Self>, ParseError> {
-        if let Some(last) = tokens.last() {
-            match last {
-                Token::ClosePeren => {
-                    tokens.pop();
-                    let in_parens = tokens.split_off(find_openning_bracket(tokens.as_slice())? + 1);
-                    tokens.pop(); // remove openning paren leftover
-                    Self::from_tokens(in_parens)
-                },
-                Token::Variable(string) => {
-                    let string = string.clone();
-                    tokens.pop();
-                    Ok(Box::new(SyntaxTree::Var(string.clone())))
-                },
-                Token::Literal(val) => {
-                    let val = *val;
-                    tokens.pop();
-                    Ok(Box::new(SyntaxTree::Num(val.into())))
-                },
-                _ => Err(ParseError::Err(format!("Invalid first token for expression: {:?}", last)))
+            })?.ok_or(ParseError::Err(format!("Invalid token: {:?}", Token::Op(Operation::Add))))?;
+            if let Some(last) = last {
+                Ok(Some(Box::new(SyntaxTree::Op(Operation::Neg, last, next))))
+            } else {
+                Ok(Some(next))
             }
-        } else {
-            Err(ParseError::Err("Unable to parse empty token stream".to_owned()))
-        }
+        })?.ok_or(ParseError::Err(format!("Invalid token: {:?}", Token::Op(Operation::Neg))))
     }
 }
 
