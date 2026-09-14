@@ -9,7 +9,9 @@ pub enum SyntaxTree {
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Operation {
     Add,
-    Mult
+    Mult,
+    Neg,
+    Div,
 }
 
 #[derive(Debug)]
@@ -164,8 +166,10 @@ where I: Iterator<Item = char> {
         },
         '(' => {chars.next(); Ok(Token::OpenPeren)},
         ')' => {chars.next(); Ok(Token::ClosePeren)},
-        '*' => {chars.next(); Ok(Token::Op(Operation::Mult))},
         '+' => {chars.next(); Ok(Token::Op(Operation::Add))},
+        '*' => {chars.next(); Ok(Token::Op(Operation::Mult))},
+        '-' => {chars.next(); Ok(Token::Op(Operation::Neg))},
+        '/' => {chars.next(); Ok(Token::Op(Operation::Div))},
         '=' => {chars.next(); Ok(Token::Eq)},
         _ => Err(format!("Invalid token first char: {}", first).to_owned())
     }
@@ -230,6 +234,8 @@ impl ToString for Operation {
         match self {
             Operation::Add => "+",
             Operation::Mult => "*",
+            Operation::Neg => "-",
+            Operation::Div => "/",
         }.to_string()
     }
 }
