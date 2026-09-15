@@ -1,7 +1,7 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SyntaxTree {
     Var(String),
-    Num(f32),
+    Num(FloatEq),
     Op(Operation, Box<SyntaxTree>, Box<SyntaxTree>),
     Eq(Box<SyntaxTree>, Box<SyntaxTree>)
 }
@@ -58,7 +58,8 @@ impl SyntaxTree {
                 let next = substream.split(|token| *token == (Token::Op(Operation::Mult), current_depth)).try_fold(None, |last, substream| {
                     let next = substream.split(|token| *token == (Token::Op(Operation::Div), current_depth)).try_fold(None, |last, substream| {
                         let next = if substream.len() == 1 {
-                            let token = &substream.first().unwrap().0;
+                            let (token, depth) = &substream.first().unwrap();
+                            if *depth != current_depth {return Err(ParseError::Err(format!("Expected depth of {}, instead found depth of {} at token {:?}", current_depth, depth, token)));}
                             let tree = match token {
                                 Token::Literal(val) => SyntaxTree::Num((*val).into()),
                                 Token::Variable(var) => SyntaxTree::Var(var.clone()),
@@ -66,7 +67,7 @@ impl SyntaxTree {
                             };
                             Box::new(tree)
                         } else {
-                            Self::from_tokens(substream.into_iter().map(|t| t.clone()).collect(), current_depth + 1)?
+                            Self::from_tokens(substream[1..substream.len() - 1].into_iter().map(|t| t.clone()).collect(), current_depth + 1)?
                         };
 
                         if let Some(last) = last {
@@ -288,15 +289,71 @@ mod test {
     #[test]
     fn syntax_test() {
         let test = "11 + 22 * 33";
-        let tree = SyntaxTree::parse(test).unwrap();
-        println!("{:?}", tree);
+        let tree = SyntaxTree::parse(test);
+        let expected = Box::new(
+            SyntaxTree::Op(
+                Operation::Add,
+                Box::new(SyntaxTree::Num(11.0.into())),
+                Box::new(SyntaxTree::Op(
+                    Operation::Mult,
+                    Box::new(SyntaxTree::Num(22.0.into())),
+                    Box::new(SyntaxTree::Num(33.0.into())),
+                )), 
+            )
+        );
+        assert_eq!(tree.unwrap(), expected);
     }
 
     #[test]
     fn syntax_parens() {
         let test = "11 + (33 + (4 * 5))";
-        let tree = SyntaxTree::parse(test).unwrap();
-        println!("{:?}", tree);
+        let tree = SyntaxTree::parse(test);
+        let expected = Box::new(
+            SyntaxTree::Op(
+                Operation::Add,
+                Box::new(SyntaxTree::Num(11.0.into())),
+                Box::new(SyntaxTree::Op(
+                    Operation::Add,
+                    Box::new(SyntaxTree::Num(33.0.into())),
+                    Box::new(SyntaxTree::Op(
+                        Operation::Mult,
+                        Box::new(SyntaxTree::Num(4.0.into())),
+                        Box::new(SyntaxTree::Num(5.0.into())),
+                    )), 
+                )), 
+            )
+        );
+        assert_eq!(tree.unwrap(), expected);
+    }
+
+    #[test]
+    fn syntax_impl_mult() {
+        let test = "11 (a (4 5)) 2 + 1";
+        let tree = SyntaxTree::parse(test);
+        let expected = Box::new(
+            SyntaxTree::Op(
+                Operation::Add,
+                Box::new(SyntaxTree::Op(
+                    Operation::Mult,
+                    Box::new(SyntaxTree::Op(
+                        Operation::Mult,
+                        Box::new(SyntaxTree::Num(11.0.into())),
+                        Box::new(SyntaxTree::Op(
+                            Operation::Mult,
+                            Box::new(SyntaxTree::Var("a".to_owned())),
+                            Box::new(SyntaxTree::Op(
+                                Operation::Mult,
+                                Box::new(SyntaxTree::Num(4.0.into())),
+                                Box::new(SyntaxTree::Num(5.0.into())),
+                            )), 
+                        )), 
+                    )),
+                    Box::new(SyntaxTree::Num(2.0.into())),
+                )), 
+                Box::new(SyntaxTree::Num(1.0.into())),
+            )
+        );
+        assert_eq!(tree.unwrap(), expected);
     }
 
     #[test]
@@ -389,9 +446,9 @@ mod test {
 
     #[test]
     fn token_invalid_char() {
-        let test = " 123 / 3231 a";
+        let test = " 123 & 3231 a";
         let tokens: Result<Vec<Token>, String> = tokanise_string(test);
-        let expected: Result<Vec<Token>, String> = Err("Invalid char: /".to_owned());
+        let expected: Result<Vec<Token>, String> = Err("Invalid char: &".to_owned());
         println!("{:?}", tokens);
         assert_eq!(tokens, expected);
     }
